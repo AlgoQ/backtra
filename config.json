@@ -1,0 +1,6 @@
+{
+    "capital": 10000,
+    "makerFee": -0.0002,
+    "takerFee": -0.0004,
+    "reduceAmount": 0.05
+}
