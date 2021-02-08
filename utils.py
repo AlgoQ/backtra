@@ -1,10 +1,6 @@
 import glob
 import numpy as np
 import pandas as pd
-# import dask.dataframe as dd
-# import dask.array as da
-import time
-import glob
 
 def fetchFolder(folderPath):
     print('Loading files...')
@@ -28,3 +24,14 @@ def fetchFile(filePath):
     histTrades.index = pd.to_datetime(histTrades.index, unit='ms')
 
     return histTrades
+
+def jsonToOhlcv(jsonFilename, interval):
+    ohlcv = pd.read_json(jsonFilename)
+    ohlcv.columns = ['date', 'Open', 'High', 'Low', 'Close', 'Volume']
+
+    ohlcv = ohlcv.set_index('date')
+    ohlcv.index = pd.to_datetime(ohlcv.index, unit='ms')
+
+    ohlcv = ohlcv.groupby(pd.Grouper(freq=interval)).agg({'Open': 'first', 'High': max, 'Low': min, 'Close': 'last', 'Volume': sum})
+
+    return ohlcv.dropna()

@@ -5,11 +5,13 @@ import numpy as np
 import pandas as pd
 
 class ExampleStrategy(BaseStrategy):
-    def __init__(self, params, histTrades, timeFrames, tpMultipier, slMultipier, maxLossPerc):
+    def __init__(self, strategyName, symbol, params, histTrades, timeFrames, tpMultipier, slMultipier, maxLossPerc):
         # Changeable values
-        self.params     = params
-        self.histTrades = histTrades
-        self.timeFrames = timeFrames
+        self.strategyName = strategyName
+        self.symbol       = symbol
+        self.params       = params
+        self.histTrades   = histTrades
+        self.timeFrames   = timeFrames
         
         # Fixed values
         self.configData      = self._getConfigData()
@@ -22,17 +24,18 @@ class ExampleStrategy(BaseStrategy):
         self.openTradesL     = []
         self.closedTradesL   = []
         self.tradeLogs       = True
-
+        
         # Optional
         self.tpMultipier = tpMultipier
         self.slMultipier = slMultipier
         self.maxLossPerc = maxLossPerc
     
     def run(self):
+        print('Trading started...')
         minKlines = max(200, self._calcMinKlines())
         
-        for i in range(minKlines, len(self.ohlcvs['5T'])): # TODO: Chance to timeframe you want to use (also on line below this)
-            tempDf = self.ohlcvs['5T'].iloc[i-minKlines:i+1].copy()
+        for i in range(minKlines, len(self.ohlcvs[self.timeFrames[0]])): # TODO: Chance to timeframe you want to use (also on line below this)
+            tempDf = self.ohlcvs[self.timeFrames[0]].iloc[i-minKlines:i+1].copy()
         
             if len(self.openTradesL) == 0:
                 # Indicators

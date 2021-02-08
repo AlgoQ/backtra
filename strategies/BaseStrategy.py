@@ -17,7 +17,7 @@ class BaseStrategy():
         for paramName, value in self.params.items():
             if isinstance(value, int):
                 paramsList.append(value)
-            else:
+            elif isinstance(value, dict):
                 for paramName, value in value.items():
                     paramsList.append(value)
 
@@ -58,7 +58,7 @@ class BaseStrategy():
 
         if tradeType == 'limit':
             self.openTradesL[0]['feeProc'] = self.makerFee
-            self.openTradesL[0]['feeOpen'] = amount * (1 - self.reduceAmount) * leverage * (self.makerFee)
+            self.openTradesL[0]['fee'] = amount * (1 - self.reduceAmount) * leverage * (self.makerFee)
         elif tradeType == 'market':
             self.openTradesL[0]['feeProc'] = self.takerFee
             self.openTradesL[0]['fee'] = amount * (1 - self.reduceAmount) * leverage * (self.takerFee)
@@ -67,7 +67,7 @@ class BaseStrategy():
             self.openTradesL[0][key] = value
 
         if self.tradeLogs == True:
-            print(f'{time} - {side.capitalize()} trade is been opened at {openPrice}, with {amount} amount and {leverage} leverage.')
+            print(f'{time} - {side.capitalize()} trade is been opened at {openPrice}, with {amount} amount and {leverage} leverage')
 
     def closeTrade(self, time, tradeType, closePrice):
         self.openTradesL[0]['closeTime'] = time
@@ -99,6 +99,11 @@ class BaseStrategy():
 
     def showResults(self):
         print('\n')
+        print(f'Strategy                {self.strategyName}')
+        print(f'Symbol                  {self.symbol}')
+        print(f'Timeframes              {self.timeFrames}')
+        print(f'Parameters              {self.params}')
+        print('___________________________________________')
         print(f'Start                   {self.ohlcvs[self.timeFrames[0]].index[1]}')
         print(f'End                     {self.ohlcvs[self.timeFrames[0]].index[-1]}')
         print(f'Duration                {abs((self.ohlcvs[self.timeFrames[0]].index[-1] - self.ohlcvs[self.timeFrames[0]].index[1]).days)} days')
@@ -107,7 +112,19 @@ class BaseStrategy():
         print(f'Return [%]              {round((self.capitalFollowup[-1] - self.capitalFollowup[0]) / self.capitalFollowup[0] * 100, 2)}')
 
         indexMaxEquity = self.capitalFollowup.index(max(self.capitalFollowup))
-        print(f'Max. Drawdown [%]       {round((min(self.capitalFollowup[indexMaxEquity:]) - max(self.capitalFollowup)) / max(self.capitalFollowup) * 100, 2)}')
+        drawdownL = []
+
+        indexCap = 0
+        
+        for i in self.capitalFollowup:
+            prevIndex = indexCap - 1
+            if i < self.capitalFollowup[prevIndex] and indexCap > 0:
+                drawdown = (i - max(self.capitalFollowup[:prevIndex + 1])) / max(self.capitalFollowup[:prevIndex + 1])
+                drawdownL.append(drawdown)
+
+            indexCap += 1
+        
+        print(f'Max. Drawdown [%]       {round(min(drawdownL) * 100, 2)}')
         
         winningTrades = []
         losingTrades = []
