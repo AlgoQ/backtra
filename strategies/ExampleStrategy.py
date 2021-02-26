@@ -5,13 +5,14 @@ import numpy as np
 import pandas as pd
 
 class ExampleStrategy(BaseStrategy):
-    def __init__(self, strategyName, symbol, params, histTrades, timeFrames, tpMultipier, slMultipier, maxLossPerc):
+    def __init__(self, strategyName, symbol, params, histTrades, timeFrames, tpMultipier, slMultipier, maxLossPerc, leverage):
         # Changeable values
         self.strategyName = strategyName
         self.symbol       = symbol
         self.params       = params
         self.histTrades   = histTrades
         self.timeFrames   = timeFrames
+        self.leverage     = leverage
         
         # Fixed values
         self.configData      = self._getConfigData()

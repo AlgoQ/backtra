@@ -57,11 +57,11 @@ class BaseStrategy():
         self.openTradesL.append({'openTime': time, 'side': side, 'leverage': leverage, 'amount': amount, 'openPrice': openPrice})
 
         if tradeType == 'limit':
-            self.openTradesL[0]['feeProc'] = self.makerFee
-            self.openTradesL[0]['fee'] = amount * (1 - self.reduceAmount) * leverage * (self.makerFee)
+            self.openTradesL[0]['feeProc'] = self.makerFee * self.leverage
+            self.openTradesL[0]['fee'] = amount * (1 - self.reduceAmount) * leverage * (self.makerFee * self.leverage)
         elif tradeType == 'market':
-            self.openTradesL[0]['feeProc'] = self.takerFee
-            self.openTradesL[0]['fee'] = amount * (1 - self.reduceAmount) * leverage * (self.takerFee)
+            self.openTradesL[0]['feeProc'] = self.takerFee * self.leverage
+            self.openTradesL[0]['fee'] = amount * (1 - self.reduceAmount) * leverage * (self.takerFee * self.leverage)
 
         for key, value in kwargs.items():
             self.openTradesL[0][key] = value
@@ -74,11 +74,11 @@ class BaseStrategy():
         self.openTradesL[0]['closePrice'] = closePrice
 
         if tradeType in ['limit', 'stopLimit']:
-            self.openTradesL[0]['feeProc'] += self.makerFee
-            self.openTradesL[0]['fee'] += self.openTradesL[0]['amount'] * (1 - self.reduceAmount) * self.openTradesL[0]['leverage'] * (self.makerFee)
+            self.openTradesL[0]['feeProc'] += self.makerFee * self.leverage
+            self.openTradesL[0]['fee'] += self.openTradesL[0]['amount'] * (1 - self.reduceAmount) * self.openTradesL[0]['leverage'] * (self.makerFee * self.leverage)
         elif tradeType == ['market', 'stopMarket']:
-            self.openTradesL[0]['feeProc'] += self.takerFee
-            self.openTradesL[0]['fee'] += self.openTradesL[0]['amount'] * (1 - self.reduceAmount) * self.openTradesL[0]['leverage'] * (self.takerFee)
+            self.openTradesL[0]['feeProc'] += self.takerFee * self.leverage
+            self.openTradesL[0]['fee'] += self.openTradesL[0]['amount'] * (1 - self.reduceAmount) * self.openTradesL[0]['leverage'] * (self.takerFee * self.leverage)
 
         if self.openTradesL[0]['side'] == 'long':
             self.openTradesL[0]['profitProc'] = (closePrice - self.openTradesL[0]['openPrice']) / self.openTradesL[0]['openPrice']
@@ -97,20 +97,7 @@ class BaseStrategy():
         self.closedTradesL.append(self.openTradesL[0])
         self.openTradesL.pop()
 
-    def showResults(self):
-        print('\n')
-        print(f'Strategy                {self.strategyName}')
-        print(f'Symbol                  {self.symbol}')
-        print(f'Timeframes              {self.timeFrames}')
-        print(f'Parameters              {self.params}')
-        print('___________________________________________')
-        print(f'Start                   {self.ohlcvs[self.timeFrames[0]].index[1]}')
-        print(f'End                     {self.ohlcvs[self.timeFrames[0]].index[-1]}')
-        print(f'Duration                {abs((self.ohlcvs[self.timeFrames[0]].index[-1] - self.ohlcvs[self.timeFrames[0]].index[1]).days)} days')
-        print(f'Equity Start [$]        {self.capitalFollowup[0]}')
-        print(f'Equity Final [$]        {round(self.capitalFollowup[-1], 4)}')
-        print(f'Return [%]              {round((self.capitalFollowup[-1] - self.capitalFollowup[0]) / self.capitalFollowup[0] * 100, 2)}')
-
+    def calcResults(self):
         indexMaxEquity = self.capitalFollowup.index(max(self.capitalFollowup))
         drawdownL = []
 
@@ -123,9 +110,7 @@ class BaseStrategy():
                 drawdownL.append(drawdown)
 
             indexCap += 1
-        
-        print(f'Max. Drawdown [%]       {round(min(drawdownL) * 100, 2)}')
-        
+
         winningTrades = []
         losingTrades = []
         for closedTrade in self.closedTradesL:
@@ -133,12 +118,32 @@ class BaseStrategy():
                 winningTrades.append(closedTrade['profitProc'])
             else:
                 losingTrades.append(closedTrade['profitProc'])
+        
+        results = {
+            'Strategy': self.strategyName,
+            'Symbol': self.symbol,
+            'Timeframes': self.timeFrames,
+            'Parameters': self.params,
+            'Start': self.ohlcvs[self.timeFrames[0]].index[1],
+            'End': self.ohlcvs[self.timeFrames[0]].index[-1],
+            'Duration': abs((self.ohlcvs[self.timeFrames[0]].index[-1] - self.ohlcvs[self.timeFrames[0]].index[1]).days),
+            'Equity Start [$]': self.capitalFollowup[0],
+            'Equity Final [$]': round(self.capitalFollowup[-1], 4),
+            'Return [%]': round((self.capitalFollowup[-1] - self.capitalFollowup[0]) / self.capitalFollowup[0] * 100, 2),
+            'Max. Drawdown [%]': round(min(drawdownL) * 100, 2),
+            'Win rate [%]': round(len(winningTrades)/len(self.closedTradesL) * 100, 2),
+            'Total trades': len(self.closedTradesL),
+            'Avg. trade [%]': round(sum(winningTrades + losingTrades) / len(winningTrades + losingTrades) * 100, 2),
+            'Avg. winning trade [%]': round(sum(winningTrades) / len(winningTrades) * 100, 2),
+            'Avg. losing trade [%]': round(sum(losingTrades) / len(losingTrades) * 100, 2)
+        }
+    
+    def showResults(self, results):
+        keys = list(results.keys())
+        maxLen = max(keys, key=len) + 1
 
-        print(f'Win rate [%]            {round(len(winningTrades)/len(self.closedTradesL) * 100, 2)}')
-        print(f'Total trades            {len(self.closedTradesL)}')
-        print(f'Avg. trade [%]          {round(sum(winningTrades + losingTrades) / len(winningTrades + losingTrades) * 100, 2)}')
-        print(f'Avg. winning trade [%]  {round(sum(winningTrades) / len(winningTrades) * 100, 2) }')
-        print(f'Avg. losing trade [%]   {round(sum(losingTrades) / len(losingTrades) * 100, 2)}')
+        for key, value in results.items():
+            print(f'{key}{" " * (maxLen - len(key))}{value}')
 
     def calcAtr(self, tempDf, longOrShort, atrPeriod:int = 14):
         warnings.filterwarnings("ignore")
