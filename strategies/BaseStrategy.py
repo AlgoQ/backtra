@@ -57,10 +57,10 @@ class BaseStrategy():
         self.openTradesL.append({'openTime': time, 'side': side, 'leverage': leverage, 'amount': amount, 'openPrice': openPrice})
 
         if tradeType == 'limit':
-            self.openTradesL[0]['feeProc'] = self.makerFee * self.leverage
+            self.openTradesL[0]['feeProc'] = self.makerFee
             self.openTradesL[0]['fee'] = amount * (1 - self.reduceAmount) * leverage * (self.makerFee * self.leverage)
         elif tradeType == 'market':
-            self.openTradesL[0]['feeProc'] = self.takerFee * self.leverage
+            self.openTradesL[0]['feeProc'] = self.takerFee
             self.openTradesL[0]['fee'] = amount * (1 - self.reduceAmount) * leverage * (self.takerFee * self.leverage)
 
         for key, value in kwargs.items():
@@ -74,11 +74,11 @@ class BaseStrategy():
         self.openTradesL[0]['closePrice'] = closePrice
 
         if tradeType in ['limit', 'stopLimit']:
-            self.openTradesL[0]['feeProc'] += self.makerFee * self.leverage
-            self.openTradesL[0]['fee'] += self.openTradesL[0]['amount'] * (1 - self.reduceAmount) * self.openTradesL[0]['leverage'] * (self.makerFee * self.leverage)
+            self.openTradesL[0]['feeProc'] += self.makerFee
+            self.openTradesL[0]['fee'] += self.openTradesL[0]['amount'] * (1 - self.reduceAmount) * self.openTradesL[0]['leverage'] * self.makerFee
         elif tradeType == ['market', 'stopMarket']:
-            self.openTradesL[0]['feeProc'] += self.takerFee * self.leverage
-            self.openTradesL[0]['fee'] += self.openTradesL[0]['amount'] * (1 - self.reduceAmount) * self.openTradesL[0]['leverage'] * (self.takerFee * self.leverage)
+            self.openTradesL[0]['feeProc'] += self.takerFee
+            self.openTradesL[0]['fee'] += self.openTradesL[0]['amount'] * (1 - self.reduceAmount) * self.openTradesL[0]['leverage'] * self.takerFee
 
         if self.openTradesL[0]['side'] == 'long':
             self.openTradesL[0]['profitProc'] = (closePrice - self.openTradesL[0]['openPrice']) / self.openTradesL[0]['openPrice']
