@@ -137,6 +137,8 @@ class BaseStrategy():
             'Avg. winning trade [%]': round(sum(winningTrades) / len(winningTrades) * 100, 2),
             'Avg. losing trade [%]': round(sum(losingTrades) / len(losingTrades) * 100, 2)
         }
+
+        return results
     
     def showResults(self, results):
         keys = list(results.keys())
