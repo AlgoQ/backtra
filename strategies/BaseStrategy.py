@@ -58,10 +58,10 @@ class BaseStrategy():
 
         if tradeType == 'limit':
             self.openTradesL[0]['feeProc'] = self.makerFee
-            self.openTradesL[0]['fee'] = amount * (1 - self.reduceAmount) * leverage * (self.makerFee * self.leverage)
+            self.openTradesL[0]['fee'] = amount * (1 - self.reduceAmount) * leverage * self.makerFee
         elif tradeType == 'market':
             self.openTradesL[0]['feeProc'] = self.takerFee
-            self.openTradesL[0]['fee'] = amount * (1 - self.reduceAmount) * leverage * (self.takerFee * self.leverage)
+            self.openTradesL[0]['fee'] = amount * (1 - self.reduceAmount) * leverage * self.takerFee
 
         for key, value in kwargs.items():
             self.openTradesL[0][key] = value
@@ -126,7 +126,7 @@ class BaseStrategy():
             'Parameters': self.params,
             'Start': self.ohlcvs[self.timeFrames[0]].index[1],
             'End': self.ohlcvs[self.timeFrames[0]].index[-1],
-            'Duration': abs((self.ohlcvs[self.timeFrames[0]].index[-1] - self.ohlcvs[self.timeFrames[0]].index[1]).days),
+            'Duration (days)': abs((self.ohlcvs[self.timeFrames[0]].index[-1] - self.ohlcvs[self.timeFrames[0]].index[1]).days),
             'Equity Start [$]': self.capitalFollowup[0],
             'Equity Final [$]': round(self.capitalFollowup[-1], 4),
             'Return [%]': round((self.capitalFollowup[-1] - self.capitalFollowup[0]) / self.capitalFollowup[0] * 100, 2),
@@ -142,8 +142,15 @@ class BaseStrategy():
     
     def showResults(self, results):
         keys = list(results.keys())
-        maxLen = max(keys, key=len) + 1
 
+        keysLen = []
+
+        for key in keys:
+            keysLen.append(len(key))
+
+        maxLen = max(keysLen) + 1
+
+        print('\n')
         for key, value in results.items():
             print(f'{key}{" " * (maxLen - len(key))}{value}')
 
