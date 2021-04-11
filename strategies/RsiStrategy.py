@@ -1,18 +1,22 @@
 from strategies.BaseStrategy import BaseStrategy
 
-from talib import RSI
 import numpy as np
 import pandas as pd
-import datetime
+
+# TODO: Import needed indicators
+from talib import RSI
+
+# Simple RSI Strategy where we go long when the price crosses over the value 50 and visa verca
 
 class RsiStrategy(BaseStrategy):
-    def __init__(self, strategyName, symbol, params, histTrades, timeFrames):
+    def __init__(self, strategyName, symbol, params, timeFrames, ohlcvs, tradeLogs=True):
         # Changeable values
         self.strategyName = strategyName
         self.symbol       = symbol
         self.params       = params
-        self.histTrades   = histTrades
         self.timeFrames   = timeFrames
+        self.ohlcvs       = ohlcvs
+        self.tradeLogs    = tradeLogs
         
         # Fixed values
         self.configData      = self._getConfigData()
@@ -20,11 +24,9 @@ class RsiStrategy(BaseStrategy):
         self.makerFee        = self.configData['makerFee']
         self.takerFee        = self.configData['takerFee']
         self.reduceAmount    = self.configData['reduceAmount']
-        self.ohlcvs          = self._createOhlcvs()
         self.capitalFollowup = [self.capital]
         self.openTradesL     = []
         self.closedTradesL   = []
-        self.tradeLogs       = True
     
     def run(self):
         minKlines = max(200, self._calcMinKlines())
@@ -50,7 +52,7 @@ class RsiStrategy(BaseStrategy):
                             if len(self.openTradesL) > 0:
                                 self.closeTrade(time=tempDf.index[-1], tradeType='market', closePrice=openPrice)
                             
-                            self.openTrade(time=tempDf.index[-1], side='long', tradeType='market', leverage=1, amount=self.capital, openPrice=openPrice)
+                            self.openTrade(time=tempDf.index[-1], side='long', tradeType='market', leverage=self.params['leverage'], amount=self.capital, openPrice=openPrice)
                             break
             
             elif rsi[-2] > 50: # Short condition 1
@@ -69,5 +71,5 @@ class RsiStrategy(BaseStrategy):
                             if len(self.openTradesL) > 0:
                                 self.closeTrade(time=tempDf.index[-1], tradeType='market', closePrice=openPrice)
 
-                            self.openTrade(time=tempDf.index[-1], side='short', tradeType='market', leverage=1, amount=self.capital, openPrice=openPrice)
+                            self.openTrade(time=tempDf.index[-1], side='short', tradeType='market', leverage=self.params['leverage'], amount=self.capital, openPrice=openPrice)
                             break
