@@ -171,6 +171,27 @@ results = goldenCross.calcResults()
 goldenCross.showResults(results)
 ```
 
+3. **Output**
+```
+Strategy               GoldenCross
+Symbol                 AAVE-PERP
+Timeframes             ['30T']
+Parameters             {'sma1': 50, 'sma2': 200, 'atr': 14, 'tpMultipier': 2, 'slMultipier': 5, 'maxLossPerc': 2, 'leverage': 2}
+Start                  2020-10-13 15:00:00
+End                    2021-04-10 14:30:00
+Duration (days)        178
+Equity Start [$]       13600.1
+Equity Final [$]       7922.3138
+Return [%]             -41.75
+Max. Drawdown [%]      -66.03
+Win rate [%]           73.33
+Total trades           45
+Avg. trade [%]         0.06
+Avg. winning trade [%] 3.81
+Avg. losing trade [%]  -10.27
+```
+
+
 If you don't have any ohlcv/kline data you can always fetch crypto kline data with [FEDA](https://github.com/JanssensKobe/feda).
 
 ## Upcoming
