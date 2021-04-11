@@ -1,6 +1,6 @@
 # Backtra
 
-Backtra is a advanced futures backtesting framework where we loop through kline (ohlcv) data on a specific way to acheive more realistic results.
+Backtra is an advanced futures backtesting framework where we loop through kline (ohlcv) data on a specific way to acheive more realistic results.
 
 This is a futures backtesting framework but it can also be used for spot backtesting.
 
@@ -133,8 +133,8 @@ class GoldenCross(BaseStrategy):
 
 3. **Main File**
 
-Now we will create a main file that runs our strategy.
-We will link this file to the strategy and send all variable values through the params.
+Now we will create a main file that connects/runs our strategy.
+I this file we send all variable values through the params, select timeframe and link your data.
 Create `mainGoldenCross.py` in the main folder:
 
 ```python
@@ -146,7 +146,7 @@ params = {'sma1': 50, 'sma2': 200, 'atr': 14, 'tpMultipier': 2, 'slMultipier': 5
 timeframe = '30T'
 
 # Convert json data file to 30min ohlcv dataframe
-ohlcv = jsonToOhlcv(r'/run/media/kobej/D/histCryptoDatafeed/data/ohlcv_ftx_AAVEPERP_179days.json', timeframe)
+ohlcv = jsonToOhlcv(r'data/ohlcv_ftx_AAVEPERP_179days.json', timeframe)
 
 precision = round(ohlcv['close'].apply(lambda x: len(str(x).split('.')[-1])).mean())
 pip = float('0.' + ('0' * (precision - 1)) + '1')
