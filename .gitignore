@@ -6,3 +6,6 @@ test
 main*
 strat*
 config*
+db
+optimize*
+compare*
