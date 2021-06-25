@@ -31,7 +31,7 @@ class RsiStrategy(BaseStrategy):
     def run(self):
         minKlines = max(200, self._calcMinKlines())
 
-        for i in range(minKlines, len(self.ohlcvs[self.timeFrames[0]])): # TODO: Chance to timeframe you want to use (also on line below this)
+        for i in range(minKlines, len(self.ohlcvs[self.timeFrames[0]])):
             tempDf = self.ohlcvs[self.timeFrames[0]].iloc[i-minKlines:i+1].copy()
 
             rsi = RSI(tempDf['close'], self.params['rsi'])

@@ -1,12 +1,11 @@
 import numpy as np
 import pandas as pd
 from talib import ATR
+import quantstats as qs
 
 import datetime
 import json
 import warnings
-
-from multiprocessing import Manager
 
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 # !!!!! DON'T CHANGE THIS FILE !!!!!
@@ -71,46 +70,53 @@ class BaseStrategy():
         if self.tradeLogs == True:
             print(f'{time} - {side.capitalize()} trade is been opened at {openPrice}, with {amount} amount and {leverage} leverage')
 
-    def closeTrade(self, id, time, tradeType, closePrice):
+    def closeTrade(self, id, time, tradeType, closePrice, quantity=1):
         self.openTradesL[id]['closeTime'] = time
         self.openTradesL[id]['closePrice'] = closePrice
 
+        self.openTradesL[id]['amount'] = self.openTradesL[id]['amount'] * quantity
+
         if tradeType in ['limit', 'stopLimit']:
-            self.openTradesL[id]['feeProc'] += self.makerFee
+            self.openTradesL[id]['feeProc'] += self.makerFee * quantity
             self.openTradesL[id]['fee'] += self.openTradesL[id]['amount'] * (1 - self.reduceAmount) * self.openTradesL[id]['leverage'] * self.makerFee
         elif tradeType in ['market', 'stopMarket']:
-            self.openTradesL[id]['feeProc'] += self.takerFee
+            self.openTradesL[id]['feeProc'] += self.takerFee * quantity
             self.openTradesL[id]['fee'] += self.openTradesL[id]['amount'] * (1 - self.reduceAmount) * self.openTradesL[id]['leverage'] * self.takerFee
 
         if self.openTradesL[id]['side'] == 'long':
-            self.openTradesL[id]['profitProc'] = (closePrice - self.openTradesL[id]['openPrice']) / self.openTradesL[id]['openPrice']
+            profitProc = (closePrice - self.openTradesL[id]['openPrice']) / self.openTradesL[id]['openPrice']
+            self.openTradesL[id]['profitProc'] = profitProc * quantity
         elif self.openTradesL[id]['side'] == 'short':
-            self.openTradesL[id]['profitProc'] = (self.openTradesL[id]['openPrice'] - closePrice) / self.openTradesL[id]['openPrice']
+            profitProc = (self.openTradesL[id]['openPrice'] - closePrice) / self.openTradesL[id]['openPrice']
+            self.openTradesL[id]['profitProc'] = profitProc * quantity
             
-        self.openTradesL[id]['profitReal'] = round(self.openTradesL[id]['profitProc'] * self.openTradesL[id]['amount'] * (1 - self.reduceAmount) * self.openTradesL[id]['leverage'] + self.openTradesL[id]['fee'], 4)
+        self.openTradesL[id]['profitReal'] = round(profitProc * self.openTradesL[id]['amount'] * (1 - self.reduceAmount) * self.openTradesL[id]['leverage'] + self.openTradesL[id]['fee'], 4)
         
         self.capital += self.openTradesL[id]['profitReal']
         self.capital = round(self.capital, 4)
-        self.capitalFollowup.append(self.capital)
+        self.capitalFollowup.append([time , self.capital])
 
         if self.tradeLogs == True:
             print(f'{time} - {self.openTradesL[id]["side"].capitalize()} trade is been closed at {closePrice}, profit/loss: {self.openTradesL[id]["profitReal"]} and current capital is now {self.capital}')
         
-        self.closedTradesL.append(self.openTradesL[id])
-        self.openTradesL.pop(id)
+        if quantity == 1:
+            self.closedTradesL.append(self.openTradesL[id])
+            self.openTradesL.pop(id)
 
     def calcResults(self):
         # Do necassary calculations
+        capitalList = []
+        for i in self.capitalFollowup:
+            capitalList.append(i[-1])
 
-        indexMaxEquity = self.capitalFollowup.index(max(self.capitalFollowup))
         drawdownL = []
 
         indexCap = 0
         
-        for i in self.capitalFollowup:
+        for i in capitalList:
             prevIndex = indexCap - 1
-            if i < self.capitalFollowup[prevIndex] and indexCap > 0:
-                drawdown = (i - max(self.capitalFollowup[:prevIndex + 1])) / max(self.capitalFollowup[:prevIndex + 1])
+            if i < capitalList[prevIndex] and indexCap > 0:
+                drawdown = (i - max(capitalList[:prevIndex + 1])) / max(capitalList[:prevIndex + 1])
                 drawdownL.append(drawdown)
 
             indexCap += 1
@@ -131,9 +137,10 @@ class BaseStrategy():
                 'Start': self.ohlcvs[self.timeFrames[0]].index[1],
                 'End': self.ohlcvs[self.timeFrames[0]].index[-1],
                 'Duration (days)': abs((self.ohlcvs[self.timeFrames[0]].index[-1] - self.ohlcvs[self.timeFrames[0]].index[1]).days),
-                'Equity Start [$]': self.capitalFollowup[0],
-                'Equity Final [$]': round(self.capitalFollowup[-1], 4),
-                'Return [%]': round((self.capitalFollowup[-1] - self.capitalFollowup[0]) / self.capitalFollowup[0] * 100, 2),
+                'Equity Start [$]': round(capitalList[0], 4),
+                'Equity Final [$]': round(capitalList[-1], 4),
+                'Equity Max [$]': round(max(capitalList), 4),
+                'Return [%]': round((capitalList[-1] - capitalList[0]) / capitalList[0] * 100, 2),
                 'Max. Drawdown [%]': round(min(drawdownL) * 100, 2),
                 'Win rate [%]': round(len(winningTrades)/len(self.closedTradesL) * 100, 2),
                 'Total trades': len(self.closedTradesL),
@@ -141,6 +148,27 @@ class BaseStrategy():
                 'Avg. winning trade [%]': round(sum(winningTrades) / len(winningTrades) * 100, 2),
                 'Avg. losing trade [%]': round(sum(losingTrades) / len(losingTrades) * 100, 2)
             }
+            
+            if self.tradeLogs == True:
+                percChange = pd.DataFrame(self.capitalFollowup, columns=['Date', 'Perc'])
+                percChange = percChange.set_index(['Date'])
+                percChange.index = pd.to_datetime(percChange.index)
+                percChange = percChange.squeeze().pct_change()
+            
+                qs.reports.html(percChange, output='results.html')
+
+            # Print dd & equity list
+
+            # print(self.capitalFollowup)
+
+            # print('\n')
+            
+            # drawdownL2 = []
+
+            # for i in drawdownL:
+            #     drawdownL2.append(i * 100)
+
+            # print(drawdownL2)
 
             return results
         else:

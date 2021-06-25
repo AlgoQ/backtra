@@ -9,3 +9,5 @@ config*
 db
 optimize*
 compare*
+results*
+.vscode
