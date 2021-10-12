@@ -70,7 +70,7 @@ class BaseStrategy():
         if self.tradeLogs == True:
             print(f'{time} - {side.capitalize()} trade is been opened at {openPrice}, with {amount} amount and {leverage} leverage')
 
-    def closeTrade(self, id, time, tradeType, closePrice, quantity=1):
+    def closeTrade(self, id, time, tradeType, closePrice, quantity=1, ema=None):
         self.openTradesL[id]['closeTime'] = time
         self.openTradesL[id]['closePrice'] = closePrice
 
@@ -90,14 +90,14 @@ class BaseStrategy():
             profitProc = (self.openTradesL[id]['openPrice'] - closePrice) / self.openTradesL[id]['openPrice']
             self.openTradesL[id]['profitProc'] = profitProc * quantity
             
-        self.openTradesL[id]['profitReal'] = round(profitProc * self.openTradesL[id]['amount'] * (1 - self.reduceAmount) * self.openTradesL[id]['leverage'] + self.openTradesL[id]['fee'], 4)
+        self.openTradesL[id]['profitReal'] = round(profitProc * self.openTradesL[id]['amount'] * (1 - self.reduceAmount) * self.openTradesL[id]['leverage'] + self.openTradesL[id]['fee'], 8)
         
         self.capital += self.openTradesL[id]['profitReal']
-        self.capital = round(self.capital, 4)
+        self.capital = round(self.capital, 8)
         self.capitalFollowup.append([time , self.capital])
 
         if self.tradeLogs == True:
-            print(f'{time} - {self.openTradesL[id]["side"].capitalize()} trade is been closed at {closePrice}, profit/loss: {self.openTradesL[id]["profitReal"]} and current capital is now {self.capital}')
+            print(f'{time} - {self.openTradesL[id]["side"].capitalize()} trade is been closed at {closePrice}, profit/loss: {self.openTradesL[id]["profitReal"]} and current capital is now {self.capital} (ema: {ema})')
         
         if quantity == 1:
             self.closedTradesL.append(self.openTradesL[id])
@@ -156,19 +156,6 @@ class BaseStrategy():
                 percChange = percChange.squeeze().pct_change()
             
                 qs.reports.html(percChange, output='results.html')
-
-            # Print dd & equity list
-
-            # print(self.capitalFollowup)
-
-            # print('\n')
-            
-            # drawdownL2 = []
-
-            # for i in drawdownL:
-            #     drawdownL2.append(i * 100)
-
-            # print(drawdownL2)
 
             return results
         else:
