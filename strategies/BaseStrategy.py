@@ -97,13 +97,15 @@ class BaseStrategy():
         self.capitalFollowup.append([time , self.capital])
 
         if self.tradeLogs == True:
-            print(f'{time} - {self.openTradesL[id]["side"].capitalize()} trade is been closed at {closePrice}, profit/loss: {self.openTradesL[id]["profitReal"]} and current capital is now {self.capital} (ema: {ema})')
+            print(f'{time} - {self.openTradesL[id]["side"].capitalize()} trade is been closed at {closePrice}, profit/loss: {self.openTradesL[id]["profitReal"]} and current capital is now {self.capital}')
         
         if quantity == 1:
             self.closedTradesL.append(self.openTradesL[id])
             self.openTradesL.pop(id)
 
     def calcResults(self):
+        # print(self.capitalFollowup)
+        
         # Do necassary calculations
         capitalList = []
         for i in self.capitalFollowup:
@@ -156,6 +158,7 @@ class BaseStrategy():
                 percChange = percChange.squeeze().pct_change()
             
                 qs.reports.html(percChange, output='results.html')
+                qs.plots.snapshot(percChange, title=f'{self.strategyName} - {self.symbol} ({self.timeFrames[0]})', savefig='/media/kobe/D/backtra/output.jpg')
 
             return results
         else:

@@ -38,7 +38,7 @@ import numpy as np
 import pandas as pd
 
 # TODO: Import needed indicators
-from talib import SMA, ATR
+from talib import SMA
 
 class GoldenCross(BaseStrategy):
     def __init__(self, strategyName, symbol, params, timeFrames, ohlcvs, tradeLogs=True):
@@ -56,78 +56,88 @@ class GoldenCross(BaseStrategy):
         self.makerFee        = self.configData['makerFee']
         self.takerFee        = self.configData['takerFee']
         self.reduceAmount    = self.configData['reduceAmount']
-        self.capitalFollowup = [self.capital]
-        self.openTradesL     = []
+        self.capitalFollowup = [[self.ohlcvs[self.timeFrames[0]].index[1], self.capital]]
+        self.openTradesL     = {}
         self.closedTradesL   = []
     
     def run(self):
         print('Trading started...')
-        minKlines = max(200, self._calcMinKlines())
+        minKlines = max(201, self._calcMinKlines())
         
-        for i in range(minKlines, len(self.ohlcvs[self.timeFrames[0]])): # TODO: Chance to timeframe you want to use (also on line below this)
+        for i in range(minKlines, len(self.ohlcvs[self.timeFrames[0]])):
             tempDf = self.ohlcvs[self.timeFrames[0]].iloc[i-minKlines:i+1].copy()
-        
-            if len(self.openTradesL) == 0:
-                # Indicators
+            
+            # Indicators
+            sma1 = SMA(tempDf['close'], self.params['sma1'])
+            sma2 = SMA(tempDf['close'], self.params['sma2'])
+
+            if sma1[-2] < sma2[-2]: # Long condition 1
+                prevClose = tempDf['close'][-1]
+                tempDf.loc[tempDf.index[-1], 'close'] = tempDf['high'][-1]
                 sma1 = SMA(tempDf['close'], self.params['sma1'])
                 sma2 = SMA(tempDf['close'], self.params['sma2'])
-
-                if sma1[-2] < sma2[-2]: # Long condition 1
-                    tempDf.loc[tempDf.index[-1], 'close'] = tempDf['high'][-1]
-                    sma1 = SMA(tempDf['close'], self.params['sma1'])
-                    sma2 = SMA(tempDf['close'], self.params['sma2'])
-                    
-                    if sma1[-1] > sma2[-1]: # Long condition 2
-                        for i in np.arange(tempDf['open'][-1], tempDf['high'][-1] + self.ohlcvs['pip'], self.ohlcvs['pip']):
-                            openPrice = round(i, self.ohlcvs['precision'])
-                            tempDf.loc[tempDf.index[-1], 'close'] = openPrice
-
-                            # Indicators
-                            sma1 = SMA(tempDf['close'], self.params['sma1'])
-                            sma2 = SMA(tempDf['close'], self.params['sma2'])
-
-                            if sma1[-1] > sma2[-1]: # Long condition 2
-                                atr = ATR(tempDf['high'], tempDf['low'], tempDf['close'], self.params['atr'])
-                                # Calculate leverage based on atr and max percentage you are willing to lose per trade
-                                leverage = self.calcLeverage(atr=atr, openPrice=openPrice, slMultipier=self.params['slMultipier'], maxLossPerc=self.params['maxLossPerc'])
-
-                                self.openTrade(time=tempDf.index[-1], side='long', tradeType='market', leverage=self.params['leverage'], amount=self.capital, openPrice=openPrice, slPrice=round(openPrice - atr[-1] * self.params['slMultipier'], self.ohlcvs['precision']), tpPrice=round(openPrice + atr[-1] * self.params['tpMultipier'], self.ohlcvs['precision']))
-                                break
                 
-                elif sma1[-2] > sma2[-2]: # Short condition 1
-                    tempDf.loc[tempDf.index[-1], 'close'] = tempDf['low'][-1]
-                    sma1 = SMA(tempDf['close'], self.params['sma1'])
-                    sma2 = SMA(tempDf['close'], self.params['sma2'])
-                    
-                    if sma1[-1] < sma2[-1]: # Short condition 2
-                        for i in np.arange(tempDf['open'][-1], tempDf['low'][-1] - self.ohlcvs['pip'], self.ohlcvs['pip'] * -1):
-                            openPrice = round(i, self.ohlcvs['precision'])
-                            tempDf.loc[tempDf.index[-1], 'close'] = openPrice
+                if sma1[-1] > sma2[-1]: # Long condition 2
+                    tempDf.loc[tempDf.index[-1], 'close'] = prevClose
+                    for i in np.arange(tempDf['open'][-1], tempDf['high'][-1] + self.ohlcvs['pip'], self.ohlcvs['pip']):
+                        openPrice = round(i, self.ohlcvs['precision'])
+                        tempDf.loc[tempDf.index[-1], 'close'] = openPrice
+
+                        # Indicators
+                        sma1 = SMA(tempDf['close'], self.params['sma1'])
+                        sma2 = SMA(tempDf['close'], self.params['sma2'])
+
+                        if sma1[-1] > sma2[-1]: # Long condition 2
+                            if len(self.openTradesL) != 0:
+                                self.closeTrade(
+                                    id = '1',
+                                    time = tempDf.index[-1],
+                                    tradeType = 'market',
+                                    closePrice = openPrice)
                             
-                            # Indicators
-                            sma1 = SMA(tempDf['close'], self.params['sma1'])
-                            sma2 = SMA(tempDf['close'], self.params['sma2'])
-
-                            if sma1[-1] < sma2[-1]: # Short condition 2
-                                atr = ATR(tempDf['high'], tempDf['low'], tempDf['close'], self.params['atr'])
-                                # Calculate leverage based on atr and max percentage you are willing to lose per trade
-                                leverage = self.calcLeverage(atr=atr, openPrice=openPrice, slMultipier=self.params['slMultipier'], maxLossPerc=self.params['maxLossPerc'])
-
-                                self.openTrade(time=tempDf.index[-1], side='short', tradeType='market', leverage=self.params['leverage'], amount=self.capital, openPrice=openPrice, slPrice=round(openPrice + atr[-1] * self.params['slMultipier'], self.ohlcvs['precision']), tpPrice=round(openPrice - atr[-1] * self.params['tpMultipier'], self.ohlcvs['precision']))
-                                break
-
-            if len(self.openTradesL) > 0:
-                if self.openTradesL[0]['side'] == 'long':
-                    if tempDf['low'][-1] < self.openTradesL[0]['slPrice']:
-                        self.closeTrade(time=tempDf.index[-1], tradeType='market', closePrice=self.openTradesL[0]['slPrice'])
-                    elif tempDf['high'][-1] > self.openTradesL[0]['tpPrice']:
-                        self.closeTrade(time=tempDf.index[-1], tradeType='market', closePrice=self.openTradesL[0]['tpPrice'])
+                            self.openTrade(
+                                id = '1',
+                                time = tempDf.index[-1],
+                                side = 'long',
+                                tradeType = 'market',
+                                leverage = self.params['leverage'],
+                                amount = self.capital,
+                                openPrice = openPrice)
+                            break
+            
+            elif sma1[-2] > sma2[-2]: # Short condition 1
+                prevClose = tempDf['close'][-1]
+                tempDf.loc[tempDf.index[-1], 'close'] = tempDf['low'][-1]
+                sma1 = SMA(tempDf['close'], self.params['sma1'])
+                sma2 = SMA(tempDf['close'], self.params['sma2'])
                 
-                elif self.openTradesL[0]['side'] == 'short':
-                    if tempDf['high'][-1] > self.openTradesL[0]['slPrice']:
-                        self.closeTrade(time=tempDf.index[-1], tradeType='market', closePrice=self.openTradesL[0]['slPrice'])
-                    elif tempDf['low'][-1] < self.openTradesL[0]['tpPrice']:
-                        self.closeTrade(time=tempDf.index[-1], tradeType='market', closePrice=self.openTradesL[0]['tpPrice'])
+                if sma1[-1] < sma2[-1]: # Short condition 2
+                    tempDf.loc[tempDf.index[-1], 'close'] = prevClose
+                    for i in np.arange(tempDf['open'][-1], tempDf['low'][-1] - self.ohlcvs['pip'], self.ohlcvs['pip'] * -1):
+                        openPrice = round(i, self.ohlcvs['precision'])
+                        tempDf.loc[tempDf.index[-1], 'close'] = openPrice
+                        
+                        # Indicators
+                        sma1 = SMA(tempDf['close'], self.params['sma1'])
+                        sma2 = SMA(tempDf['close'], self.params['sma2'])
+
+                        if sma1[-1] < sma2[-1]: # Short condition 2
+                            if len(self.openTradesL) != 0:
+                                self.closeTrade(
+                                    id='1',
+                                    time = tempDf.index[-1],
+                                    tradeType = 'market',
+                                    closePrice = openPrice)
+                            
+                            self.openTrade(
+                                id = '1',
+                                time = tempDf.index[-1],
+                                side = 'short',
+                                tradeType = 'market',
+                                leverage = self.params['leverage'],
+                                amount = self.capital,
+                                openPrice = openPrice)
+                            break
 ```
 
 
@@ -138,18 +148,22 @@ I this file we send all variable values through the params, select timeframe and
 Create `mainGoldenCross.py` in the main folder:
 
 ```python
-from strategies.GoldenCross2 import GoldenCross
+ffrom strategies.GoldenCross import GoldenCross
 from utils import jsonToOhlcv
 
-# Include all variable values in the params
-params = {'sma1': 50, 'sma2': 200, 'atr': 14, 'tpMultipier': 2, 'slMultipier': 5, 'maxLossPerc': 2, 'leverage': 2}
-timeframe = '30T'
+params = {'sma1': 50, 'sma2': 200, 'leverage': 1}
 
-# Convert json data file to 30min ohlcv dataframe
-ohlcv = jsonToOhlcv(r'data/ohlcv_ftx_AAVEPERP_179days.json', timeframe)
+timeframe = '4h'
 
-precision = round(ohlcv['close'].apply(lambda x: len(str(x).split('.')[-1])).mean())
-pip = float('0.' + ('0' * (precision - 1)) + '1')
+ohlcv = jsonToOhlcv(r'/media/kobe/D/feda/data/ohlcv_ftx_BTCUSD_784days.json', timeframe)
+
+# precision = round(ohlcv['close'].apply(lambda x: len(str(x).split('.')[-1])).mean())
+
+precision = 0
+if precision > 0:
+    pip = float('0.' + ('0' * (precision - 1)) + '1')
+else:
+    pip = 1
 
 ohlcvs = {}
 ohlcvs['precision'] = precision
@@ -157,9 +171,9 @@ ohlcvs['pip'] = pip
 ohlcvs[timeframe] = ohlcv
 
 goldenCross = GoldenCross(
-    strategyName = 'GoldenCross',
-    symbol = 'AAVE-PERP',
-    params= params,
+    strategyName = 'Golden Cross',
+    symbol = 'BTC/USD',
+    params = params,
     ohlcvs = ohlcvs,
     timeFrames = [timeframe],
     tradeLogs = True
@@ -173,22 +187,23 @@ goldenCross.showResults(results)
 
 3. **Output**
 ```
-Strategy               GoldenCross
-Symbol                 AAVE-PERP
-Timeframes             ['30T']
-Parameters             {'sma1': 50, 'sma2': 200, 'atr': 14, 'tpMultipier': 2, 'slMultipier': 5, 'maxLossPerc': 2, 'leverage': 2}
-Start                  2020-10-13 15:00:00
-End                    2021-04-10 14:30:00
-Duration (days)        178
-Equity Start [$]       13600.1
-Equity Final [$]       7922.3138
-Return [%]             -41.75
-Max. Drawdown [%]      -66.03
-Win rate [%]           73.33
-Total trades           45
-Avg. trade [%]         0.06
-Avg. winning trade [%] 3.81
-Avg. losing trade [%]  -10.27
+Strategy               Golden Cross
+Symbol                 BTC/USD
+Timeframes             ['4h']
+Parameters             {'sma1': 50, 'sma2': 200, 'leverage': 1}
+Start                  2019-08-20 16:00:00
+End                    2021-10-12 12:00:00
+Duration (days)        783
+Equity Start [$]       1000
+Equity Final [$]       4008.08
+Equity Max [$]         7246.6379
+Return [%]             300.81
+Max. Drawdown [%]      -47.21
+Win rate [%]           41.67
+Total trades           24
+Avg. trade [%]         11.02
+Avg. winning trade [%] 38.99
+Avg. losing trade [%]  -8.96
 ```
 
 
