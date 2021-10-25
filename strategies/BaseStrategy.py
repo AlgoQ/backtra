@@ -55,7 +55,7 @@ class BaseStrategy():
         pass
     
     def openTrade(self, id, time, side, tradeType, leverage, amount, openPrice, **kwargs):
-        self.openTradesL[id] = {'openTime': time, 'side': side, 'leverage': leverage, 'amount': amount, 'openPrice': openPrice}
+        self.openTradesL[id] = {'openTime': time, 'side': side, 'leverage': leverage, 'amount': amount, 'openPrice': openPrice, 'profitReal': 0}
 
         if tradeType == 'limit':
             self.openTradesL[id]['feeProc'] = self.makerFee
@@ -68,7 +68,7 @@ class BaseStrategy():
             self.openTradesL[id][key] = value
 
         if self.tradeLogs == True:
-            print(f'{time} - {side.capitalize()} trade is been opened at {openPrice}, with {amount} amount and {leverage} leverage')
+            print(f'{time} - {side.capitalize()} trade is been opened at {round(openPrice, self.ohlcvs["precision"])}, with {round(amount, self.ohlcvs["precision"])} amount and {leverage} leverage')
 
     def closeTrade(self, id, time, tradeType, closePrice, quantity=1, ema=None):
         self.openTradesL[id]['closeTime'] = time
@@ -84,20 +84,23 @@ class BaseStrategy():
             self.openTradesL[id]['fee'] += self.openTradesL[id]['amount'] * (1 - self.reduceAmount) * self.openTradesL[id]['leverage'] * self.takerFee
 
         if self.openTradesL[id]['side'] == 'long':
-            profitProc = (closePrice - self.openTradesL[id]['openPrice']) / self.openTradesL[id]['openPrice']
+            profitProc = (closePrice - self.openTradesL[id]['openPrice'] + self.openTradesL[id]['fee']) / self.openTradesL[id]['openPrice']
             self.openTradesL[id]['profitProc'] = profitProc * quantity
         elif self.openTradesL[id]['side'] == 'short':
-            profitProc = (self.openTradesL[id]['openPrice'] - closePrice) / self.openTradesL[id]['openPrice']
+            profitProc = (self.openTradesL[id]['openPrice'] - closePrice - self.openTradesL[id]['fee']) / self.openTradesL[id]['openPrice']
             self.openTradesL[id]['profitProc'] = profitProc * quantity
             
-        self.openTradesL[id]['profitReal'] = round(profitProc * self.openTradesL[id]['amount'] * (1 - self.reduceAmount) * self.openTradesL[id]['leverage'] + self.openTradesL[id]['fee'], 8)
+        self.openTradesL[id]['profitReal'] += round(profitProc * self.openTradesL[id]['amount'] * (1 - self.reduceAmount) * self.openTradesL[id]['leverage'], 8)
         
         self.capital += self.openTradesL[id]['profitReal']
         self.capital = round(self.capital, 8)
         self.capitalFollowup.append([time , self.capital])
 
         if self.tradeLogs == True:
-            print(f'{time} - {self.openTradesL[id]["side"].capitalize()} trade is been closed at {closePrice}, profit/loss: {self.openTradesL[id]["profitReal"]} and current capital is now {self.capital}')
+            if quantity < 1:
+                print(f'{time} - {self.openTradesL[id]["side"].capitalize()} trade is been partly closed at {round(closePrice, self.ohlcvs["precision"])}, profit/loss: {round(self.openTradesL[id]["profitReal"], 4)} and current capital is now {self.capital}')
+            else:
+                print(f'{time} - {self.openTradesL[id]["side"].capitalize()} trade is been closed at {round(closePrice, self.ohlcvs["precision"])}, profit/loss: {round(self.openTradesL[id]["profitReal"], 4)} and current capital is now {self.capital}')
         
         if quantity == 1:
             self.closedTradesL.append(self.openTradesL[id])
@@ -125,11 +128,19 @@ class BaseStrategy():
 
         winningTrades = []
         losingTrades = []
+        longTrades = []
+        shortTrades = []
         for closedTrade in self.closedTradesL:
             if closedTrade['profitProc'] >= 0:
                 winningTrades.append(closedTrade['profitProc'])
             else:
                 losingTrades.append(closedTrade['profitProc'])
+            
+            if closedTrade['side'] == 'long':
+                longTrades.append(closedTrade['profitProc'])
+            else:
+                shortTrades.append(closedTrade['profitProc'])
+        
         if len(drawdownL) > 0:
             results = {
                 'Strategy': self.strategyName,
@@ -145,20 +156,24 @@ class BaseStrategy():
                 'Return [%]': round((capitalList[-1] - capitalList[0]) / capitalList[0] * 100, 2),
                 'Max. Drawdown [%]': round(min(drawdownL) * 100, 2),
                 'Win rate [%]': round(len(winningTrades)/len(self.closedTradesL) * 100, 2),
+                'Buy & Hold [%]': round((self.ohlcvs[self.timeFrames[0]]['close'][-1] - self.ohlcvs[self.timeFrames[0]]['close'][0]) / self.ohlcvs[self.timeFrames[0]]['close'][0] * 100, 2),
+                'Drawdown Return': round(abs(round(min(drawdownL) * 100, 2)) * (capitalList[-1] - capitalList[0]) / capitalList[0] * 100, 2),
                 'Total trades': len(self.closedTradesL),
                 'Avg. trade [%]': round(sum(winningTrades + losingTrades) / len(winningTrades + losingTrades) * 100, 2),
                 'Avg. winning trade [%]': round(sum(winningTrades) / len(winningTrades) * 100, 2),
-                'Avg. losing trade [%]': round(sum(losingTrades) / len(losingTrades) * 100, 2)
+                'Avg. losing trade [%]': round(sum(losingTrades) / len(losingTrades) * 100, 2),
+                'Avg. long trade [%]': round(sum(longTrades) / len(longTrades) * 100, 2),
+                'Avg. short trade [%]': round(sum(shortTrades) / len(shortTrades) * 100, 2)
             }
             
-            if self.tradeLogs == True:
-                percChange = pd.DataFrame(self.capitalFollowup, columns=['Date', 'Perc'])
-                percChange = percChange.set_index(['Date'])
-                percChange.index = pd.to_datetime(percChange.index)
-                percChange = percChange.squeeze().pct_change()
+            # if self.tradeLogs == True:
+            #     percChange = pd.DataFrame(self.capitalFollowup, columns=['Date', 'Perc'])
+            #     percChange = percChange.set_index(['Date'])
+            #     percChange.index = pd.to_datetime(percChange.index)
+            #     percChange = percChange.squeeze().pct_change()
             
-                qs.reports.html(percChange, output='results.html')
-                qs.plots.snapshot(percChange, title=f'{self.strategyName} - {self.symbol} ({self.timeFrames[0]})', savefig='/media/kobe/D/backtra/output.jpg')
+            #     qs.reports.html(percChange, output='results.html')
+            #     qs.plots.snapshot(percChange, title=f'{self.strategyName} - {self.symbol} ({self.timeFrames[0]})', savefig='/media/kobe/D/backtra/output.jpg')
 
             return results
         else:
@@ -188,7 +203,7 @@ class BaseStrategy():
             else:
                 mask = (tempDf2.index > str(tempDf.index[-1])) & (tempDf2.index <= str(tempDf2[tempDf2['price'].le(tempDf['close'][-1])].index[id]))
 
-            atrRow = tempDf2.loc[mask].groupby(pd.Grouper(freq='5T')).agg({'price': ['first', max, min, 'last'], 'amount': sum}) # TODO: Timeframe aanpassen
+            atrRow = tempDf2.loc[mask].groupby(pd.Grouper(freq='5T')).agg({'price': ['first', max, min, 'last'], 'amount': sum}) # TODO: Change Timeframe
             atrRow.columns = ['open', 'high', 'low', 'close', 'volume']
 
             atrDf = pd.concat([tempDf[:-1].copy(), atrRow])
