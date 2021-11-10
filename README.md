@@ -7,6 +7,14 @@ This is a futures backtesting framework but it can also be used for spot backtes
 **More in-depth documentation is coming soon!**
 
 ## Getting Started
+
+### Install
+```
+git clone https://github.com/AlgoQ/backtra
+cd backtra
+pip install -r requirements
+```
+
 We will be backtesting a simple golden cross strategy with a stoploss and take profit based on the ATR. The leverage is also based on the ATR and the max percentage you are willing to lose per trade.
 
 ![Golden Cross](https://www.investopedia.com/thmb/NXwxIinKHx9FmoP52xsMkae6lbs=/1536x0/filters:no_upscale():max_bytes(150000):strip_icc():format(webp)/GoldenCross-5c6592b646e0fb0001a91e29.png)
