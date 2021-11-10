@@ -156,8 +156,9 @@ I this file we send all variable values through the params, select timeframe and
 Create `mainGoldenCross.py` in the main folder:
 
 ```python
-ffrom strategies.GoldenCross import GoldenCross
+from strategies.GoldenCross import GoldenCross
 from utils import jsonToOhlcv
+import quantstats as qs
 
 params = {'sma1': 50, 'sma2': 200, 'leverage': 1}
 
@@ -189,8 +190,10 @@ goldenCross = GoldenCross(
 
 goldenCross.run()
 
-results = goldenCross.calcResults()
+results, percChange = goldenCross.calcResults()
 goldenCross.showResults(results)
+
+qs.plots.snapshot(percChange, title=f'Results', savefig=f'Results')
 ```
 
 3. **Output**
@@ -202,18 +205,23 @@ Parameters             {'sma1': 50, 'sma2': 200, 'leverage': 1}
 Start                  2019-08-20 16:00:00
 End                    2021-10-12 12:00:00
 Duration (days)        783
-Equity Start [$]       1000
-Equity Final [$]       4008.08
-Equity Max [$]         7246.6379
-Return [%]             300.81
-Max. Drawdown [%]      -47.21
-Win rate [%]           41.67
+Equity Start [$]       10000
+Equity Final [$]       58406.2285
+Equity Max [$]         89791.4633
+Return [%]             484.06
+Max. Drawdown [%]      -39.86
+Win rate [%]           54.17
+Buy & Hold [%]         424.69
 Total trades           24
-Avg. trade [%]         11.02
-Avg. winning trade [%] 38.99
-Avg. losing trade [%]  -8.96
+Avg. trade [%]         12.52
+Avg. winning trade [%] 31.36
+Avg. losing trade [%]  -9.74
+Avg. long trade [%]    24.64
+Avg. short trade [%]   0.4
 ```
 
+Snapshot:
+![Golden Cross](readmeResults.png)
 
 If you don't have any ohlcv/kline data you can always fetch crypto kline data with [FEDA](https://github.com/JanssensKobe/feda).
 
