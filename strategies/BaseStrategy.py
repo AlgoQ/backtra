@@ -55,42 +55,44 @@ class BaseStrategy():
         pass
     
     def openTrade(self, id, time, side, tradeType, leverage, amount, openPrice, **kwargs):
-        self.openTradesL[id] = {'openTime': time, 'side': side, 'leverage': leverage, 'amount': amount, 'openPrice': openPrice, 'profitReal': 0}
+        self.openTradesL[id] = {'openTime': time, 'side': side, 'leverage': leverage, 'amount': amount * (1 - self.reduceAmount) * leverage, 'openPrice': openPrice, 'profitReal': 0}
 
         if tradeType == 'limit':
-            self.openTradesL[id]['feeProc'] = self.makerFee
-            self.openTradesL[id]['fee'] = amount * (1 - self.reduceAmount) * leverage * self.makerFee
+            feeRate = self.makerFee
         elif tradeType == 'market':
-            self.openTradesL[id]['feeProc'] = self.takerFee
-            self.openTradesL[id]['fee'] = amount * (1 - self.reduceAmount) * leverage * self.takerFee
+            feeRate = self.takerFee
+        
+        self.openTradesL[id]['feesProc'] = feeRate
+        self.openTradesL[id]['fees'] = self.openTradesL[id]['amount'] * feeRate
 
         for key, value in kwargs.items():
             self.openTradesL[id][key] = value
 
         if self.tradeLogs == True:
-            print(f'{time} - {side.capitalize()} trade is been opened at {round(openPrice, self.ohlcvs["precision"])}, with {round(amount, self.ohlcvs["precision"])} amount and {leverage} leverage')
+            print(f'{time} - {side.capitalize()} trade is been opened at {round(openPrice, self.ohlcvs["precision"])}, with {round(amount, self.ohlcvs["precision"])} as amount')
 
     def closeTrade(self, id, time, tradeType, closePrice, quantity=1, ema=None):
         self.openTradesL[id]['closeTime'] = time
         self.openTradesL[id]['closePrice'] = closePrice
 
-        self.openTradesL[id]['amount'] = self.openTradesL[id]['amount'] * quantity
-
+        closeAmount = self.openTradesL[id]['amount'] * quantity
+        
         if tradeType in ['limit', 'stopLimit']:
-            self.openTradesL[id]['feeProc'] += self.makerFee * quantity
-            self.openTradesL[id]['fee'] += self.openTradesL[id]['amount'] * (1 - self.reduceAmount) * self.openTradesL[id]['leverage'] * self.makerFee
+            feeRate = self.makerFee
         elif tradeType in ['market', 'stopMarket']:
-            self.openTradesL[id]['feeProc'] += self.takerFee * quantity
-            self.openTradesL[id]['fee'] += self.openTradesL[id]['amount'] * (1 - self.reduceAmount) * self.openTradesL[id]['leverage'] * self.takerFee
+            feeRate = self.takerFee
+        
+        self.openTradesL[id]['feesProc'] += feeRate
+        self.openTradesL[id]['fees'] += closeAmount * feeRate
 
         if self.openTradesL[id]['side'] == 'long':
-            profitProc = (closePrice - self.openTradesL[id]['openPrice'] + self.openTradesL[id]['fee']) / self.openTradesL[id]['openPrice']
-            self.openTradesL[id]['profitProc'] = profitProc * quantity
+            profitProc = (closePrice - self.openTradesL[id]['openPrice']) / self.openTradesL[id]['openPrice'] * quantity + (self.openTradesL[id]['feesProc'] * self.openTradesL[id]['leverage'] * quantity)
+            self.openTradesL[id]['profitProc'] = profitProc
         elif self.openTradesL[id]['side'] == 'short':
-            profitProc = (self.openTradesL[id]['openPrice'] - closePrice - self.openTradesL[id]['fee']) / self.openTradesL[id]['openPrice']
-            self.openTradesL[id]['profitProc'] = profitProc * quantity
+            profitProc = (self.openTradesL[id]['openPrice'] - closePrice) / self.openTradesL[id]['openPrice'] * quantity + (self.openTradesL[id]['feesProc'] * self.openTradesL[id]['leverage'] * quantity)
+            self.openTradesL[id]['profitProc'] = profitProc
             
-        self.openTradesL[id]['profitReal'] += round(profitProc * self.openTradesL[id]['amount'] * (1 - self.reduceAmount) * self.openTradesL[id]['leverage'], 8)
+        self.openTradesL[id]['profitReal'] += round(profitProc * closeAmount, 8)
         
         self.capital += self.openTradesL[id]['profitReal']
         self.capital = round(self.capital, 8)
@@ -102,6 +104,8 @@ class BaseStrategy():
             else:
                 print(f'{time} - {self.openTradesL[id]["side"].capitalize()} trade is been closed at {round(closePrice, self.ohlcvs["precision"])}, profit/loss: {round(self.openTradesL[id]["profitReal"], 4)} and current capital is now {self.capital}')
         
+        self.openTradesL[id]['amount'] = self.openTradesL[id]['amount'] - closeAmount
+
         if quantity == 1:
             self.closedTradesL.append(self.openTradesL[id])
             self.openTradesL.pop(id)
@@ -142,40 +146,58 @@ class BaseStrategy():
                 shortTrades.append(closedTrade['profitProc'])
         
         if len(drawdownL) > 0:
-            results = {
-                'Strategy': self.strategyName,
-                'Symbol': self.symbol,
-                'Timeframes': self.timeFrames,
-                'Parameters': self.params,
-                'Start': self.ohlcvs[self.timeFrames[0]].index[1],
-                'End': self.ohlcvs[self.timeFrames[0]].index[-1],
-                'Duration (days)': abs((self.ohlcvs[self.timeFrames[0]].index[-1] - self.ohlcvs[self.timeFrames[0]].index[1]).days),
-                'Equity Start [$]': round(capitalList[0], 4),
-                'Equity Final [$]': round(capitalList[-1], 4),
-                'Equity Max [$]': round(max(capitalList), 4),
-                'Return [%]': round((capitalList[-1] - capitalList[0]) / capitalList[0] * 100, 2),
-                'Max. Drawdown [%]': round(min(drawdownL) * 100, 2),
-                'Win rate [%]': round(len(winningTrades)/len(self.closedTradesL) * 100, 2),
-                'Buy & Hold [%]': round((self.ohlcvs[self.timeFrames[0]]['close'][-1] - self.ohlcvs[self.timeFrames[0]]['close'][0]) / self.ohlcvs[self.timeFrames[0]]['close'][0] * 100, 2),
-                'Drawdown Return': round(abs(round(min(drawdownL) * 100, 2)) * (capitalList[-1] - capitalList[0]) / capitalList[0] * 100, 2),
-                'Total trades': len(self.closedTradesL),
-                'Avg. trade [%]': round(sum(winningTrades + losingTrades) / len(winningTrades + losingTrades) * 100, 2),
-                'Avg. winning trade [%]': round(sum(winningTrades) / len(winningTrades) * 100, 2),
-                'Avg. losing trade [%]': round(sum(losingTrades) / len(losingTrades) * 100, 2),
-                'Avg. long trade [%]': round(sum(longTrades) / len(longTrades) * 100, 2),
-                'Avg. short trade [%]': round(sum(shortTrades) / len(shortTrades) * 100, 2)
-            }
+            if len(shortTrades) > 0:
+                results = {
+                    'Strategy': self.strategyName,
+                    'Symbol': self.symbol,
+                    'Timeframes': self.timeFrames,
+                    'Parameters': self.params,
+                    'Start': self.ohlcvs[self.timeFrames[0]].index[1],
+                    'End': self.ohlcvs[self.timeFrames[0]].index[-1],
+                    'Duration (days)': abs((self.ohlcvs[self.timeFrames[0]].index[-1] - self.ohlcvs[self.timeFrames[0]].index[1]).days),
+                    'Equity Start [$]': round(capitalList[0], 4),
+                    'Equity Final [$]': round(capitalList[-1], 4),
+                    'Equity Max [$]': round(max(capitalList), 4),
+                    'Return [%]': round((capitalList[-1] - capitalList[0]) / capitalList[0] * 100, 2),
+                    'Max. Drawdown [%]': round(min(drawdownL) * 100, 2),
+                    'Win rate [%]': round(len(winningTrades)/len(self.closedTradesL) * 100, 2),
+                    'Buy & Hold [%]': round((self.ohlcvs[self.timeFrames[0]]['close'][-1] - self.ohlcvs[self.timeFrames[0]]['close'][0]) / self.ohlcvs[self.timeFrames[0]]['close'][0] * 100, 2),
+                    'Total trades': len(self.closedTradesL),
+                    'Avg. trade [%]': round(sum(winningTrades + losingTrades) / len(winningTrades + losingTrades) * 100, 2),
+                    'Avg. winning trade [%]': round(sum(winningTrades) / len(winningTrades) * 100, 2),
+                    'Avg. losing trade [%]': round(sum(losingTrades) / len(losingTrades) * 100, 2),
+                    'Avg. long trade [%]': round(sum(longTrades) / len(longTrades) * 100, 2),
+                    'Avg. short trade [%]': round(sum(shortTrades) / len(shortTrades) * 100, 2)
+                }
+            else:
+                results = {
+                    'Strategy': self.strategyName,
+                    'Symbol': self.symbol,
+                    'Timeframes': self.timeFrames,
+                    'Parameters': self.params,
+                    'Start': self.ohlcvs[self.timeFrames[0]].index[1],
+                    'End': self.ohlcvs[self.timeFrames[0]].index[-1],
+                    'Duration (days)': abs((self.ohlcvs[self.timeFrames[0]].index[-1] - self.ohlcvs[self.timeFrames[0]].index[1]).days),
+                    'Equity Start [$]': round(capitalList[0], 4),
+                    'Equity Final [$]': round(capitalList[-1], 4),
+                    'Equity Max [$]': round(max(capitalList), 4),
+                    'Return [%]': round((capitalList[-1] - capitalList[0]) / capitalList[0] * 100, 2),
+                    'Max. Drawdown [%]': round(min(drawdownL) * 100, 2),
+                    'Win rate [%]': round(len(winningTrades)/len(self.closedTradesL) * 100, 2),
+                    'Buy & Hold [%]': round((self.ohlcvs[self.timeFrames[0]]['close'][-1] - self.ohlcvs[self.timeFrames[0]]['close'][0]) / self.ohlcvs[self.timeFrames[0]]['close'][0] * 100, 2),
+                    'Total trades': len(self.closedTradesL),
+                    'Avg. trade [%]': round(sum(winningTrades + losingTrades) / len(winningTrades + losingTrades) * 100, 2),
+                    'Avg. winning trade [%]': round(sum(winningTrades) / len(winningTrades) * 100, 2),
+                    'Avg. losing trade [%]': round(sum(losingTrades) / len(losingTrades) * 100, 2),
+                    'Avg. long trade [%]': round(sum(longTrades) / len(longTrades) * 100, 2)
+                }
             
-            # if self.tradeLogs == True:
-            #     percChange = pd.DataFrame(self.capitalFollowup, columns=['Date', 'Perc'])
-            #     percChange = percChange.set_index(['Date'])
-            #     percChange.index = pd.to_datetime(percChange.index)
-            #     percChange = percChange.squeeze().pct_change()
-            
-            #     qs.reports.html(percChange, output='results.html')
-            #     qs.plots.snapshot(percChange, title=f'{self.strategyName} - {self.symbol} ({self.timeFrames[0]})', savefig='/media/kobe/D/backtra/output.jpg')
+            percChange = pd.DataFrame(self.capitalFollowup, columns=['Date', 'Perc'])
+            percChange = percChange.set_index(['Date'])
+            percChange.index = pd.to_datetime(percChange.index)
+            percChange = percChange.squeeze().pct_change()
 
-            return results
+            return [results, percChange]
         else:
             return None
     
