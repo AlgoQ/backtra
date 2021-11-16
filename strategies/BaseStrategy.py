@@ -83,26 +83,27 @@ class BaseStrategy():
             feeRate = self.takerFee
         
         self.openTradesL[id]['feesProc'] += feeRate
-        self.openTradesL[id]['fees'] += closeAmount * feeRate
+        fees = closeAmount * feeRate * -1
+        self.openTradesL[id]['fees'] += fees
 
         if self.openTradesL[id]['side'] == 'long':
-            profitProc = (closePrice - self.openTradesL[id]['openPrice']) / self.openTradesL[id]['openPrice'] * quantity + (self.openTradesL[id]['feesProc'] * self.openTradesL[id]['leverage'] * quantity)
+            profitProc = (closePrice - self.openTradesL[id]['openPrice']) / self.openTradesL[id]['openPrice'] * quantity
             self.openTradesL[id]['profitProc'] = profitProc
         elif self.openTradesL[id]['side'] == 'short':
-            profitProc = (self.openTradesL[id]['openPrice'] - closePrice) / self.openTradesL[id]['openPrice'] * quantity + (self.openTradesL[id]['feesProc'] * self.openTradesL[id]['leverage'] * quantity)
+            profitProc = (self.openTradesL[id]['openPrice'] - closePrice) / self.openTradesL[id]['openPrice'] * quantity
             self.openTradesL[id]['profitProc'] = profitProc
-            
-        self.openTradesL[id]['profitReal'] += round(profitProc * closeAmount, 8)
         
-        self.capital += self.openTradesL[id]['profitReal']
+        self.openTradesL[id]['profitReal'] += round(profitProc * closeAmount + fees, 8)
+        
+        self.capital += profitProc * closeAmount
         self.capital = round(self.capital, 8)
         self.capitalFollowup.append([time , self.capital])
 
         if self.tradeLogs == True:
             if quantity < 1:
-                print(f'{time} - {self.openTradesL[id]["side"].capitalize()} trade is been partly closed at {round(closePrice, self.ohlcvs["precision"])}, profit/loss: {round(self.openTradesL[id]["profitReal"], 4)} and current capital is now {self.capital}')
+                print(f'{time} - {self.openTradesL[id]["side"].capitalize()} trade is been partly closed at {round(closePrice, self.ohlcvs["precision"])}, profit/loss: {round(profitProc * closeAmount, 4)} and current capital is now {self.capital}')
             else:
-                print(f'{time} - {self.openTradesL[id]["side"].capitalize()} trade is been closed at {round(closePrice, self.ohlcvs["precision"])}, profit/loss: {round(self.openTradesL[id]["profitReal"], 4)} and current capital is now {self.capital}')
+                print(f'{time} - {self.openTradesL[id]["side"].capitalize()} trade is been closed at {round(closePrice, self.ohlcvs["precision"])}, profit/loss: {round(profitProc * closeAmount, 4)} and current capital is now {self.capital}')
         
         self.openTradesL[id]['amount'] = self.openTradesL[id]['amount'] - closeAmount
 
