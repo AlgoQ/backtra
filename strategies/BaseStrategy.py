@@ -71,7 +71,7 @@ class BaseStrategy():
         if self.tradeLogs == True:
             print(f'{time} - {side.capitalize()} trade is been opened at {round(openPrice, self.ohlcvs["precision"])}, with {round(amount, self.ohlcvs["precision"])} as amount')
 
-    def closeTrade(self, id, time, tradeType, closePrice, quantity=1, ema=None):
+    def closeTrade(self, id, time, tradeType, closePrice, quantity=1):
         self.openTradesL[id]['closeTime'] = time
         self.openTradesL[id]['closePrice'] = closePrice
 
