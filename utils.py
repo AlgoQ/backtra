@@ -35,3 +35,14 @@ def jsonToOhlcv(jsonFilename, interval):
     ohlcv = ohlcv.groupby(pd.Grouper(freq=interval)).agg({'open': 'first', 'high': max, 'low': min, 'close': 'last', 'volume': sum})
 
     return ohlcv.dropna()
+
+def csvToOhlcv(jsonFilename, interval):
+    ohlcv = pd.read_csv(jsonFilename)
+    ohlcv.columns = ['date', 'open', 'high', 'low', 'close', 'volume']
+
+    ohlcv = ohlcv.set_index('date')
+    ohlcv.index = pd.to_datetime(ohlcv.index)
+
+    ohlcv = ohlcv.groupby(pd.Grouper(freq=interval)).agg({'open': 'first', 'high': max, 'low': min, 'close': 'last', 'volume': sum})
+
+    return ohlcv.dropna()

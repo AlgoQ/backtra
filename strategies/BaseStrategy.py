@@ -124,9 +124,8 @@ class BaseStrategy():
         indexCap = 0
         
         for i in capitalList:
-            prevIndex = indexCap - 1
-            if i < capitalList[prevIndex] and indexCap > 0:
-                drawdown = (i - max(capitalList[:prevIndex + 1])) / max(capitalList[:prevIndex + 1])
+            if i < capitalList[indexCap - 1] and indexCap > 0:
+                drawdown = (i - max(capitalList[:indexCap])) / max(capitalList[:indexCap])
                 drawdownL.append(drawdown)
 
             indexCap += 1
@@ -161,6 +160,7 @@ class BaseStrategy():
                     'Equity Max [$]': round(max(capitalList), 4),
                     'Return [%]': round((capitalList[-1] - capitalList[0]) / capitalList[0] * 100, 2),
                     'Max. Drawdown [%]': round(min(drawdownL) * 100, 2),
+                    'DD Return [%]': round(((capitalList[-1] - capitalList[0]) / capitalList[0] * 100) * (1 + min(drawdownL)), 2),
                     'Win rate [%]': round(len(winningTrades)/len(self.closedTradesL) * 100, 2),
                     'Buy & Hold [%]': round((self.ohlcvs[self.timeFrames[0]]['close'][-1] - self.ohlcvs[self.timeFrames[0]]['close'][0]) / self.ohlcvs[self.timeFrames[0]]['close'][0] * 100, 2),
                     'Total trades': len(self.closedTradesL),
@@ -184,6 +184,7 @@ class BaseStrategy():
                     'Equity Max [$]': round(max(capitalList), 4),
                     'Return [%]': round((capitalList[-1] - capitalList[0]) / capitalList[0] * 100, 2),
                     'Max. Drawdown [%]': round(min(drawdownL) * 100, 2),
+                    'DD Return [%]': round(((capitalList[-1] - capitalList[0]) / capitalList[0] * 100) * (1 + min(drawdownL)), 2),
                     'Win rate [%]': round(len(winningTrades)/len(self.closedTradesL) * 100, 2),
                     'Buy & Hold [%]': round((self.ohlcvs[self.timeFrames[0]]['close'][-1] - self.ohlcvs[self.timeFrames[0]]['close'][0]) / self.ohlcvs[self.timeFrames[0]]['close'][0] * 100, 2),
                     'Total trades': len(self.closedTradesL),
@@ -197,6 +198,8 @@ class BaseStrategy():
             percChange = percChange.set_index(['Date'])
             percChange.index = pd.to_datetime(percChange.index)
             percChange = percChange.squeeze().pct_change()
+
+            results['Sharpe Ratio'] = round(qs.stats.sharpe(percChange, periods=365), 2)
 
             return [results, percChange]
         else:
@@ -215,6 +218,7 @@ class BaseStrategy():
         print('\n')
         for key, value in results.items():
             print(f'{key}{" " * (maxLen - len(key))}{value}')
+        print('\n')
 
     def calcAtr(self, tempDf, longOrShort, atrPeriod:int = 14):
         warnings.filterwarnings("ignore")
