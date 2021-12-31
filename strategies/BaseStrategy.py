@@ -12,6 +12,8 @@ import warnings
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 class BaseStrategy():
+    feesPaid = 0
+    
     def _calcMinKlines(self):
         paramsList = []
 
@@ -63,7 +65,7 @@ class BaseStrategy():
             feeRate = self.takerFee
         
         self.openTradesL[id]['feesProc'] = feeRate
-        self.openTradesL[id]['fees'] = self.openTradesL[id]['amount'] * feeRate
+        self.openTradesL[id]['fees'] = self.openTradesL[id]['amount'] * feeRate * -1
 
         for key, value in kwargs.items():
             self.openTradesL[id][key] = value
@@ -83,8 +85,8 @@ class BaseStrategy():
             feeRate = self.takerFee
         
         self.openTradesL[id]['feesProc'] += feeRate
-        fees = closeAmount * feeRate * -1
-        self.openTradesL[id]['fees'] += fees
+        self.openTradesL[id]['fees'] += self.openTradesL[id]['amount'] * feeRate * -1
+        self.feesPaid += self.openTradesL[id]['fees']
 
         if self.openTradesL[id]['side'] == 'long':
             profitProc = (closePrice - self.openTradesL[id]['openPrice']) / self.openTradesL[id]['openPrice'] * quantity
@@ -93,17 +95,17 @@ class BaseStrategy():
             profitProc = (self.openTradesL[id]['openPrice'] - closePrice) / self.openTradesL[id]['openPrice'] * quantity
             self.openTradesL[id]['profitProc'] = profitProc
         
-        self.openTradesL[id]['profitReal'] += round(profitProc * closeAmount + fees, 8)
+        self.openTradesL[id]['profitReal'] += round(profitProc * closeAmount + self.openTradesL[id]['fees'], 8)
         
-        self.capital += profitProc * closeAmount
+        self.capital += self.openTradesL[id]['profitReal']
         self.capital = round(self.capital, 8)
-        self.capitalFollowup.append([time , self.capital])
+        self.capitalFollowup.append([time, self.capital])
 
         if self.tradeLogs == True:
             if quantity < 1:
-                print(f'{time} - {self.openTradesL[id]["side"].capitalize()} trade is been partly closed at {round(closePrice, self.ohlcvs["precision"])}, profit/loss: {round(profitProc * closeAmount, 4)} and current capital is now {self.capital}')
+                print(f'{time} - {self.openTradesL[id]["side"].capitalize()} trade is been partly closed at {round(closePrice, self.ohlcvs["precision"])}, profit/loss: {round(self.openTradesL[id]["profitReal"], 4)} and current capital is now {round(self.capital, 4)}')
             else:
-                print(f'{time} - {self.openTradesL[id]["side"].capitalize()} trade is been closed at {round(closePrice, self.ohlcvs["precision"])}, profit/loss: {round(profitProc * closeAmount, 4)} and current capital is now {self.capital}')
+                print(f'{time} - {self.openTradesL[id]["side"].capitalize()} trade is been closed at {round(closePrice, self.ohlcvs["precision"])}, profit/loss: {round(self.openTradesL[id]["profitReal"], 4)} and current capital is now {round(self.capital, 4)}')
         
         self.openTradesL[id]['amount'] = self.openTradesL[id]['amount'] - closeAmount
 
@@ -168,7 +170,8 @@ class BaseStrategy():
                     'Avg. winning trade [%]': round(sum(winningTrades) / len(winningTrades) * 100, 2),
                     'Avg. losing trade [%]': round(sum(losingTrades) / len(losingTrades) * 100, 2),
                     'Avg. long trade [%]': round(sum(longTrades) / len(longTrades) * 100, 2),
-                    'Avg. short trade [%]': round(sum(shortTrades) / len(shortTrades) * 100, 2)
+                    'Avg. short trade [%]': round(sum(shortTrades) / len(shortTrades) * 100, 2),
+                    'Fees paid [$]': round(self.feesPaid, 2)
                 }
             else:
                 results = {
@@ -191,7 +194,8 @@ class BaseStrategy():
                     'Avg. trade [%]': round(sum(winningTrades + losingTrades) / len(winningTrades + losingTrades) * 100, 2),
                     'Avg. winning trade [%]': round(sum(winningTrades) / len(winningTrades) * 100, 2),
                     'Avg. losing trade [%]': round(sum(losingTrades) / len(losingTrades) * 100, 2),
-                    'Avg. long trade [%]': round(sum(longTrades) / len(longTrades) * 100, 2)
+                    'Avg. long trade [%]': round(sum(longTrades) / len(longTrades) * 100, 2),
+                    'Fees paid [$]': round(self.feesPaid, 2)
                 }
             
             percChange = pd.DataFrame(self.capitalFollowup, columns=['Date', 'Perc'])
