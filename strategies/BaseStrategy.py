@@ -164,6 +164,7 @@ class BaseStrategy():
                     'Max. Drawdown [%]': round(min(drawdownL) * 100, 2),
                     'DD Return [%]': round(((capitalList[-1] - capitalList[0]) / capitalList[0] * 100) * (1 + min(drawdownL)), 2),
                     'Win rate [%]': round(len(winningTrades)/len(self.closedTradesL) * 100, 2),
+                    'Loss rate [%]': round(len(losingTrades)/len(self.closedTradesL) * 100, 2),
                     'Buy & Hold [%]': round((self.ohlcvs[self.timeFrames[0]]['close'][-1] - self.ohlcvs[self.timeFrames[0]]['close'][0]) / self.ohlcvs[self.timeFrames[0]]['close'][0] * 100, 2),
                     'Total trades': len(self.closedTradesL),
                     'Avg. trade [%]': round(sum(winningTrades + losingTrades) / len(winningTrades + losingTrades) * 100, 2),
@@ -189,6 +190,7 @@ class BaseStrategy():
                     'Max. Drawdown [%]': round(min(drawdownL) * 100, 2),
                     'DD Return [%]': round(((capitalList[-1] - capitalList[0]) / capitalList[0] * 100) * (1 + min(drawdownL)), 2),
                     'Win rate [%]': round(len(winningTrades)/len(self.closedTradesL) * 100, 2),
+                    'Loss rate [%]': round(len(losingTrades)/len(self.closedTradesL) * 100, 2),
                     'Buy & Hold [%]': round((self.ohlcvs[self.timeFrames[0]]['close'][-1] - self.ohlcvs[self.timeFrames[0]]['close'][0]) / self.ohlcvs[self.timeFrames[0]]['close'][0] * 100, 2),
                     'Total trades': len(self.closedTradesL),
                     'Avg. trade [%]': round(sum(winningTrades + losingTrades) / len(winningTrades + losingTrades) * 100, 2),
@@ -203,11 +205,13 @@ class BaseStrategy():
             percChange.index = pd.to_datetime(percChange.index)
             percChange = percChange.squeeze().pct_change()
 
-            results['Sharpe Ratio'] = round(qs.stats.sharpe(percChange, periods=365), 2)
+            results['Sharpe Ratio'] = round(qs.stats.sharpe(percChange, periods=365, trading_year_days=365), 2)
+            results['Expected Return'] = round(results['Avg. winning trade [%]'] / abs(results['Avg. losing trade [%]']), 4)
+            results['Kelly Criterion'] = round((results['Expected Return'] * ((results['Win rate [%]'] / 100) - (results['Loss rate [%]'] / 100))) / results['Expected Return'], 4)
 
             return [results, percChange]
         else:
-            return None
+            return [None, None]
     
     def showResults(self, results):
         keys = list(results.keys())
