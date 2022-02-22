@@ -71,7 +71,7 @@ class BaseStrategy():
             self.openTradesL[id][key] = value
 
         if self.tradeLogs == True:
-            print(f'{time} - {side.capitalize()} trade is been opened at {round(openPrice, self.ohlcvs["precision"])}, with {round(amount, self.ohlcvs["precision"])} as amount')
+            print(f'{time} - {side.capitalize()} trade (id {id}) is been opened at {round(openPrice, self.ohlcvs["precision"])}, with {round(self.openTradesL[id]["amount"], self.ohlcvs["precision"])} as amount')
 
     def closeTrade(self, id, time, tradeType, closePrice, quantity=1):
         self.openTradesL[id]['closeTime'] = time
@@ -103,9 +103,9 @@ class BaseStrategy():
 
         if self.tradeLogs == True:
             if quantity < 1:
-                print(f'{time} - {self.openTradesL[id]["side"].capitalize()} trade is been partly closed at {round(closePrice, self.ohlcvs["precision"])}, profit/loss: {round(self.openTradesL[id]["profitReal"], 4)} and current capital is now {round(self.capital, 4)}')
+                print(f'{time} - {self.openTradesL[id]["side"].capitalize()} trade (id {id}) is been partly closed at {round(closePrice, self.ohlcvs["precision"])}, profit/loss: {round(self.openTradesL[id]["profitReal"], 4)} and current capital is now {round(self.capital, 4)}')
             else:
-                print(f'{time} - {self.openTradesL[id]["side"].capitalize()} trade is been closed at {round(closePrice, self.ohlcvs["precision"])}, profit/loss: {round(self.openTradesL[id]["profitReal"], 4)} and current capital is now {round(self.capital, 4)}')
+                print(f'{time} - {self.openTradesL[id]["side"].capitalize()} trade (id {id}) is been closed at {round(closePrice, self.ohlcvs["precision"])}, profit/loss: {round(self.openTradesL[id]["profitReal"], 4)} and current capital is now {round(self.capital, 4)}')
         
         self.openTradesL[id]['amount'] = self.openTradesL[id]['amount'] - closeAmount
 
@@ -207,7 +207,7 @@ class BaseStrategy():
 
             results['Sharpe Ratio'] = round(qs.stats.sharpe(percChange, periods=365, trading_year_days=365), 2)
             results['Expected Return'] = round(results['Avg. winning trade [%]'] / abs(results['Avg. losing trade [%]']), 4)
-            results['Kelly Criterion'] = round((results['Expected Return'] * ((results['Win rate [%]'] / 100) - (results['Loss rate [%]'] / 100))) / results['Expected Return'], 4)
+            results['Kelly Criterion'] = round((results['Expected Return'] * (results['Win rate [%]'] / 100) - (results['Loss rate [%]'] / 100)) / results['Expected Return'], 4)
 
             return [results, percChange]
         else:
