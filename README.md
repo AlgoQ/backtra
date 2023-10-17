@@ -1,3 +1,5 @@
+**DEPRECATED**
+
 # Backtra
 
 Backtra is an advanced futures backtesting framework where we loop through kline (ohlcv) data on a specific way to acheive more realistic results.
